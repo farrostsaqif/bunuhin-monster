@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bunuhin Monster - Prototype</title>
+    <style>
+        :root {
+            --bg: #121212; --panel: #1e1e2f; --primary: #ff4757; 
+            --gold: #ffa502; --hp: #ff6b81; --prestige: #9b59b6; --weapon: #a4b0be;
+            --slot-bg: #2f3542; --text: #f1f2f6;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .game-container { width: 100%; max-width: 900px; display: grid; gap: 20px; }
+
+        /* HEADER & STATS */
+        .header { background: var(--panel); padding: 15px; border-radius: 12px; text-align: center; border-bottom: 4px solid var(--primary); }
+        .header h1 { margin: 0; color: var(--text); font-size: 26px; text-transform: uppercase; letter-spacing: 2px;}
+        .stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; margin-top: 15px; font-size: 14px; font-weight: bold; }
+        .stat-box { background: #121212; padding: 8px 15px; border-radius: 8px; border: 1px solid var(--slot-bg); }
+        
+        /* CITY TRACK */
+        .track-container { background: var(--panel); padding: 20px; border-radius: 12px; }
+        .track-title { margin-top: 0; border-bottom: 2px solid var(--slot-bg); padding-bottom: 10px; font-size: 16px; display: flex; justify-content: space-between; align-items: center;}
+        .city-track { display: flex; gap: 8px; position: relative; flex-wrap: wrap; justify-content: center;}
+        
+        .slot {
+            width: 80px; height: 80px; background: var(--slot-bg); border-radius: 8px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; text-align: center; font-weight: bold; border: 2px solid transparent;
+        }
+        .slot.guild { border-color: var(--prestige); }
+        .slot.shop { border-color: var(--weapon); }
+        .slot.potion { border-color: var(--hp); }
+        .slot.blackmarket { border-color: #ff4757; background: #2d181b; }
+        
+        #pawn { position: absolute; font-size: 30px; top: 20px; z-index: 10; transition: 0.3s ease-out; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.8)); left: 25px; }
+
+        /* MAIN AREA */
+        .main-content { display: grid; grid-template-columns: 1fr 300px; gap: 20px; }
+        .panel { background: var(--panel); padding: 20px; border-radius: 12px; }
+
+        .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; transition: 0.3s; }
+        .board.locked { opacity: 0.4; pointer-events: none; } 
+        
+        .tile {
+            aspect-ratio: 1; background: var(--slot-bg); border-radius: 8px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; font-weight: bold; font-size: 12px; text-align: center;
+            border: 2px solid #57606f; transition: 0.2s; user-select: none; padding: 5px;
+        }
+        .tile:hover { transform: scale(1.05); border-color: var(--primary); }
+        .tile.revealed { background: #121212; cursor: default; border-color: #2f3542;}
+        .tile.monster { color: var(--hp); border-color: var(--hp); }
+        .tile.gold { color: var(--gold); }
+        .tile.trap { color: #ff4757; }
+        
+        /* CONTROLS */
+        .controls { text-align: center; }
+        .dice-box { font-size: 45px; margin: 10px 0; }
+        .rolling { animation: roll 0.3s infinite; }
+        @keyframes roll { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(15deg) scale(1.2); } 100% { transform: rotate(-15deg) scale(1); } }
+        
+        button {
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            font-weight: bold; font-size: 14px; cursor: pointer;
+            background: var(--primary); color: white; transition: 0.2s; margin-bottom: 10px;
+        }
+        button:hover { background: #ff6b81; }
+        button:disabled { background: #57606f; cursor: not-allowed; }
+        .btn-flee { background: #747d8c; }
+        .btn-flee:hover { background: #a4b0be; }
+
+        .log-container { height: 200px; overflow-y: auto; background: #121212; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 12px; text-align: left; }
+        .log-entry { margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #2f3542; }
+        
+        #combat-zone { display: none; padding: 15px; background: rgba(255, 71, 87, 0.1); border: 1px solid var(--hp); border-radius: 8px; margin-top: 15px; text-align: center; }
+        .phase-badge { background: var(--primary); color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="header">
+        <h1>🗡️ Bunuhin Monster (Guild)</h1>
+        <div class="stats">
+            <div class="stat-box" style="color: var(--hp)">❤️ Stamina: <span id="val-stamina">2</span>/10</div>
+            <div class="stat-box" style="color: var(--gold)">💰 Gold: <span id="val-gold">4</span>/10</div>
+            <div class="stat-box" style="color: var(--weapon)">⚔️ Senjata: <span id="val-weapon">1</span>/3</div>
+            <div class="stat-box" style="color: var(--prestige)">🎖️ Prestige: <span id="val-prestige">0</span></div>
+        </div>
+    </div>
+
+    <div class="track-container">
+        <h2 class="track-title">
+            Area Kota (Luar)
+            <span class="phase-badge" id="phase-indicator">Fase: Lempar Dadu</span>
+        </h2>
+        <div class="city-track" id="city-track">
+            <div id="pawn">🥷</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="panel">
+            <h2 class="track-title">Hutan Eksplorasi (Dalam)</h2>
+            <div class="board locked" id="board"></div>
+            
+            <div id="combat-zone">
+                <h3 style="color: var(--hp); margin-top: 0; font-size: 16px;">⚠️ Bertarung Lawan: <span id="monster-name"></span></h3>
+                <div style="background: #121212; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 13px;">
+                    HP Monster: <span id="monster-hp" style="color: var(--gold); font-size: 16px; font-weight: bold;"></span> | 
+                    Sisa Dadu: <span id="monster-rolls" style="font-weight: bold;"></span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-hit" onclick="rollCombat()">Serang!</button>
+                    <button class="btn-flee" onclick="flee()">Kabur (-1 ❤️)</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel controls">
+            <h2 class="track-title">Aksi Pemain</h2>
+            <div class="dice-box" id="dice-visual">🎲</div>
+            <button id="btn-roll" onclick="rollMovement()">🎲 Lempar Dadu Gerak</button>
+            <h3 style="text-align: left; font-size: 13px; margin-top: 20px;">Catatan Perjalanan:</h3>
+            <div class="log-container" id="log"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let phase = 'ROLL'; 
+    let gold = 4, stamina = 2, weapons = 1, prestige = 0;
+    const maxGold = 10, maxStamina = 10, maxWeapons = 3;
+    let currentPos = 0;
+    
+    // Combat States
+    let currentMonsterData = null;
+    let currentTileEl = null;
+    let mHP = 0, maxRolls = 0, rollsDone = 0;
+    
+    // CITY TRACK (10 Petak untuk melingkar)
+    const trackData = [
+        { name: "Guild Hall", type: "guild", effect: () => { prestige++; addLog("Guild Hall: +1 Prestige", "#2ecc71"); } },
+        { name: "Jalanan", type: "street", effect: () => { addLog("Jalanan: Area aman."); } },
+        { name: "Gunshop", type: "shop", effect: () => { 
+            if(gold >= 2 && weapons < maxWeapons){ gold -= 2; weapons++; addLog("Gunshop: Wajib beli senjata (-2 Gold)", "#ffa502"); } 
+            else { addLog("Gunshop: Uang kurang atau ransel senjata penuh.", "#a4b0be"); } 
+        } },
+        { name: "Pinggir Hutan", type: "street", effect: () => { addLog("Pinggir Hutan: Area aman."); } },
+        { name: "Toko Ramuan", type: "potion", effect: () => { stamina = Math.min(maxStamina, stamina+3); addLog("Toko Ramuan: +3 Stamina", "#ff6b81"); } },
+        { name: "Black Market", type: "blackmarket", effect: () => { 
+            if(gold > 0) { gold--; addLog("Black Market: Dipalak 1 Gold!", "#ff4757"); }
+            else if(weapons > 0) { weapons--; addLog("Black Market: Dipalak 1 Senjata!", "#ff4757"); }
+            else { addLog("Black Market: Kamu miskin, dilepas preman.", "#a4b0be"); }
+        } },
+        { name: "Jalanan", type: "street", effect: () => { addLog("Jalanan: Area aman."); } },
+        { name: "Gunshop", type: "shop", effect: () => { 
+            if(gold >= 2 && weapons < maxWeapons){ gold -= 2; weapons++; addLog("Gunshop: Wajib beli senjata (-2 Gold)", "#ffa502"); } 
+            else { addLog("Gunshop: Uang kurang/penuh.", "#a4b0be"); } 
+        } },
+        { name: "Toko Ramuan", type: "potion", effect: () => { stamina = Math.min(maxStamina, stamina+3); addLog("Toko Ramuan: +3 Stamina", "#ff6b81"); } },
+        { name: "Pinggir Hutan", type: "street", effect: () => { addLog("Pinggir Hutan: Area aman."); } }
+    ];
+
+    const trackEl = document.getElementById('city-track');
+    trackData.forEach((slot, i) => {
+        let div = document.createElement('div');
+        div.className = `slot ${slot.type}`;
+        div.id = `slot-${i}`;
+        div.innerHTML = `<span>${slot.name}</span>`;
+        trackEl.appendChild(div);
+    });
+
+    // FOREST TILES
+    const rawTiles = [
+        { type: "monster", name: "Trump", hp: 2, p: 20, g: 4 },
+        { type: "monster", name: "Netanyahu", hp: 2, p: 17, g: 3 },
+        { type: "monster", name: "Prabowo", hp: 2, p: 14, g: 3 },
+        { type: "monster", name: "Gibran", hp: 2, p: 10, g: 2 },
+        { type: "monster", name: "Bahlil", hp: 2, p: 7, g: 2 },
+        { type: "gold", name: "Harta Karun", val: 5 },
+        { type: "gold", name: "Harta Karun", val: 3 },
+        { type: "gold", name: "Harta Karun", val: 2 },
+        { type: "trap", name: "Jebakan", val: -3 },
+        { type: "trap", name: "Jebakan", val: -2 },
+        { type: "trap", name: "Jebakan", val: -2 },
+        { type: "empty", name: "Kosong" }, { type: "empty", name: "Kosong" }, 
+        { type: "empty", name: "Kosong" }, { type: "empty", name: "Kosong" }, { type: "empty", name: "Kosong" }
+    ];
+
+    const boardEl = document.getElementById('board');
+    rawTiles.sort(() => Math.random() - 0.5).forEach((data, i) => {
+        let tile = document.createElement('div');
+        tile.className = 'tile'; tile.innerHTML = '❔';
+        tile.dataset.info = JSON.stringify(data);
+        tile.onclick = () => revealTile(tile, data);
+        boardEl.appendChild(tile);
+    });
+
+    function addLog(msg, color="white") {
+        document.getElementById('log').innerHTML = `<div class="log-entry" style="color:${color}">> ${msg}</div>` + document.getElementById('log').innerHTML;
+    }
+
+    function updateUI() {
+        document.getElementById('val-gold').innerText = gold;
+        document.getElementById('val-stamina').innerText = stamina;
+        document.getElementById('val-weapon').innerText = weapons;
+        document.getElementById('val-prestige').innerText = prestige;
+        
+        if(stamina <= 0) {
+            addLog("STAMINA 0! Kamu pingsan dan diseret ke Guild Hall.", "#ff4757");
+            stamina = 1; // Aturan khusus: bangkit dengan 1 stamina
+            currentPos = 0; // Balik ke guild hall
+            updatePawnPosition();
+            
+            if(phase === 'COMBAT') {
+                // Update sisa HP monster di papan kalau mati pas tarung
+                currentTileEl.innerHTML = `${currentMonsterData.name}<br>(${mHP} HP)`;
+                document.getElementById('combat-zone').style.display = 'none';
+            }
+            endTurn(); 
+            updateUI();
+        }
+    }
+
+    function updatePhase(newPhase, text) {
+        phase = newPhase;
+        document.getElementById('phase-indicator').innerText = text;
+    }
+
+    function updatePawnPosition() {
+        let targetSlot = document.getElementById(`slot-${currentPos}`);
+        if(!targetSlot) return;
+        let rectTrack = trackEl.getBoundingClientRect();
+        let rectSlot = targetSlot.getBoundingClientRect();
+        let moveX = rectSlot.left - rectTrack.left + (rectSlot.width / 2) - 15;
+        let moveY = rectSlot.top - rectTrack.top + (rectSlot.height / 2) - 15;
+        document.getElementById('pawn').style.transform = `translate(${moveX}px, ${moveY}px)`;
+    }
+    setTimeout(updatePawnPosition, 100);
+
+    // FASE 1: KOTA
+    function rollMovement() {
+        if(phase !== 'ROLL') return;
+        updatePhase('MOVING', 'Fase: Bergerak');
+        document.getElementById('btn-roll').disabled = true;
+        let diceVis = document.getElementById('dice-visual');
+        diceVis.classList.add('rolling');
+        
+        setTimeout(() => {
+            diceVis.classList.remove('rolling');
+            let steps = Math.floor(Math.random() * 6) + 1; // Dadu 1-6
+            diceVis.innerHTML = `🎲 ${steps}`;
+            
+            let stepsTaken = 0;
+            let moveInterval = setInterval(() => {
+                currentPos++;
+                if(currentPos >= trackData.length) currentPos = 0;
+                updatePawnPosition();
+                stepsTaken++;
+                
+                if(stepsTaken >= steps) {
+                    clearInterval(moveInterval);
+                    trackData[currentPos].effect();
+                    updateUI();
+                    
+                    updatePhase('EXPLORE', 'Fase: Eksplorasi Hutan');
+                    boardEl.classList.remove('locked');
+                    addLog(`Wajib buka 1 ubin di Hutan!`);
+                }
+            }, 300);
+        }, 400);
+    }
+
+    // FASE 2: EKSPLORASI
+    function revealTile(tile, data) {
+        if(phase !== 'EXPLORE') return;
+        if(tile.classList.contains('revealed') && data.type !== 'monster') return;
+        
+        // Cek kalau itu monster yang udah terbuka (Scavenging)
+        if(tile.classList.contains('revealed') && data.type === 'monster') {
+             if(data.hp <= 0) return; // Udah mati
+             addLog(`Menyerang kembali ${data.name}! (Sisa HP: ${data.hp})`, "#ff6b81");
+        } else {
+             tile.classList.add('revealed');
+             addLog(`Membuka ubin: ${data.name}`);
+        }
+
+        if(data.type === 'monster') {
+            tile.classList.add('monster');
+            tile.innerHTML = `${data.name}<br>(${data.hp} HP)`;
+            updatePhase('COMBAT', 'Fase: Bertarung!');
+            
+            currentTileEl = tile;
+            currentMonsterData = data;
+            mHP = data.hp; 
+            rollsDone = 0;
+            document.getElementById('combat-zone').style.display = 'block';
+            document.getElementById('monster-name').innerText = data.name;
+
+            // Cek Senjata
+            if (weapons > 0) {
+                weapons--; 
+                mHP -= 1; // Auto 1 hit
+                maxRolls = 2;
+                addLog("⚔️ Senjata dipakai! Monster kena 1 Hit otomatis.", "#a4b0be");
+            } else {
+                maxRolls = 3;
+                addLog("Tangan kosong! Kesempatan 3x dadu.", "#ff6b81");
+            }
+            
+            if(mHP <= 0) {
+                winCombat(); // Kalau sisa 1 HP dan ditembak senjata langsung mati
+            } else {
+                updateCombatUI();
+            }
+        } else {
+            if(data.type === 'gold') {
+                tile.classList.add('gold'); tile.innerHTML = `+${data.val} 💰`;
+                gold = Math.min(maxGold, gold + data.val);
+                addLog(`Dapat Harta: +${data.val} Gold`, "#ffa502");
+            } else if(data.type === 'trap') {
+                tile.classList.add('trap'); tile.innerHTML = `Jebakan<br>${data.val} ❤️`;
+                stamina += data.val;
+                addLog(`Kena Jebakan! Stamina ${data.val}`, "#ff4757");
+            } else {
+                tile.innerHTML = "Kosong";
+            }
+            updateUI();
+            if(stamina > 0) endTurn();
+        }
+    }
+
+    // FASE 3: BERTARUNG
+    function updateCombatUI() {
+        document.getElementById('monster-hp').innerText = mHP;
+        document.getElementById('monster-rolls').innerText = (maxRolls - rollsDone);
+    }
+
+    function rollCombat() {
+        let diceVis = document.getElementById('dice-visual');
+        diceVis.classList.add('rolling');
+        document.getElementById('btn-hit').disabled = true;
+        
+        setTimeout(() => {
+            diceVis.classList.remove('rolling');
+            document.getElementById('btn-hit').disabled = false;
+            
+            rollsDone++;
+            let roll = Math.floor(Math.random() * 6) + 1;
+            diceVis.innerHTML = `⚔️ ${roll}`;
+            
+            if(roll >= 4) {
+                mHP--;
+                addLog(`Dadu [${roll}]: SERANGAN MASUK!`, "#2ecc71");
+                if(mHP <= 0) { winCombat(); return; }
+            } else {
+                addLog(`Dadu [${roll}]: Meleset! Monster menyerang (-2 ❤️)`, "#ff4757");
+                stamina -= 2;
+            }
+            
+            updateUI();
+            if (stamina > 0) {
+                if (rollsDone >= maxRolls) {
+                    addLog("Jatah dadu habis! Giliran terhenti.", "#ffa502");
+                    endCombat();
+                } else { updateCombatUI(); }
+            }
+        }, 300);
+    }
+
+    function winCombat() {
+        addLog(`☠️ ${currentMonsterData.name} Mati! (+${currentMonsterData.p} Prestige, +${currentMonsterData.g} Gold)`, "#9b59b6");
+        prestige += currentMonsterData.p;
+        gold = Math.min(maxGold, gold + currentMonsterData.g);
+        currentMonsterData.hp = 0; // Tandai mati
+        currentTileEl.innerHTML = `❌<br>${currentMonsterData.name}`;
+        currentTileEl.style.opacity = 0.5;
+        document.getElementById('combat-zone').style.display = 'none';
+        updateUI();
+        endTurn();
+    }
+
+    function flee() {
+        addLog("Memilih kabur! (-1 ❤️)", "#a4b0be");
+        stamina -= 1;
+        updateUI();
+        if(stamina > 0) endCombat();
+    }
+
+    function endCombat() {
+        // Simpan HP monster yang tersisa ke data ubin
+        currentMonsterData.hp = mHP;
+        currentTileEl.innerHTML = `${currentMonsterData.name}<br>(${mHP} HP)`;
+        document.getElementById('combat-zone').style.display = 'none';
+        endTurn();
+    }
+
+    function endTurn() {
+        updatePhase('ROLL', 'Fase: Lempar Dadu');
+        boardEl.classList.add('locked');
+        document.getElementById('btn-roll').disabled = false;
+        document.getElementById('dice-visual').innerHTML = `🎲`;
+        addLog("--- GILIRAN SELESAI ---", "#57606f");
+    }
+</script>
+</body>
+</html>
